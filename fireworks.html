@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+varying vec4 fColor;
+varying float fTime;
+
+void main(){
+    fColor = vec4(1.0, 1.0, 1.0, 1.0);
+    fTime = 0.0;
+    gl_Position = vPosition;
+    gl_PointSize = 2.0;
+}
+</script>
+    
+<script id="vertex-shader2" type="x-shader/x-vertex">
+const vec4 acc = vec4(0.0, -0.8, 0.0, 0.0);
+const float expGap = 0.5;
+attribute vec4 vInitialPosition;
+attribute vec4 vFinalPosition;
+attribute vec4 vLaunchTime;
+attribute vec4 vExplosionVelocity;
+attribute vec4 vExplosionVelocity2;
+attribute vec4 vColor;
+attribute vec4 vFallTime;
+attribute vec4 vFallSpeed;
+
+varying vec4 fColor;
+varying float fTime;
+
+uniform vec4 time;
+
+void main(){
+    fColor = vColor;
+
+    float timeElapsed = (time.x-vLaunchTime.x);
+    float explosionTime = (vInitialPosition.y-vFinalPosition.y)/acc.y;
+    float t = explosionTime + expGap;
+    vec4 initialVelocity = (vFinalPosition-vInitialPosition);
+    vec4 initVel = vec4(initialVelocity.x, 0.0, 0.0, 0.0);
+    vec4 initExpVel = vec4(vExplosionVelocity.x, 0.0, 0.0, 0.0);
+    gl_PointSize = 2.0;
+    
+    if (explosionTime < 0.0) {
+        explosionTime = 0.0;
+    }
+    /* In case both are 0.0, means that we have an explosion without falling points */
+    if (vFallTime.x == 0.0 && vFallTime.y == 0.0) {
+        /* In case it hasnt exploded yet */
+        if (timeElapsed-explosionTime < 0.0) {
+            gl_Position = vInitialPosition + initialVelocity*timeElapsed + 0.5*acc*timeElapsed*timeElapsed;
+        } else {
+            vec4 preExplosionPosition = vInitialPosition + initialVelocity*explosionTime + 0.5*acc*explosionTime*explosionTime;
+            
+            /* In case one is not 0.0, means that that we a have a 2nd level explosion */
+            if(vExplosionVelocity.x != 0.0 || vExplosionVelocity.y != 0.0) {
+                /* Handles first explosion */
+                if(timeElapsed < t) {
+                    gl_Position = preExplosionPosition + (initVel+vExplosionVelocity)*(timeElapsed-explosionTime) + 0.5*acc*(timeElapsed-explosionTime)*(timeElapsed-explosionTime);
+                } 
+                /* Handles second explosion */
+                else {
+                    vec4 preExplosionPosition2 = preExplosionPosition + (initVel+ vExplosionVelocity)*expGap + 0.5*acc*expGap*expGap;
+                    
+                    gl_Position = preExplosionPosition2 + (initExpVel+vExplosionVelocity2)*(timeElapsed-t) + 0.5*acc*(timeElapsed-t)*(timeElapsed-t);
+                }
+            } 
+            /* Handles 1 level explosion */
+            else {
+                gl_Position = preExplosionPosition + (initVel+vExplosionVelocity2)*(timeElapsed-explosionTime) + 0.5*acc*(timeElapsed-explosionTime)*(timeElapsed-explosionTime);
+            }
+        }
+        fTime = timeElapsed - t;
+    }
+    /* Handles explosion with falling points */
+    else {
+        /* If the point has not fallen yet */
+        if (time.x < vFallTime.x) {
+            gl_Position = vInitialPosition + initialVelocity*timeElapsed + 0.5*acc*timeElapsed*timeElapsed;
+        } 
+        /* If the point has already fallen */
+        else {
+            vec4 prePosition = vInitialPosition + initialVelocity*(vFallTime.x - vLaunchTime.x) + 0.5*acc*(vFallTime.x - vLaunchTime.x)*(vFallTime.x - vLaunchTime.x);
+
+            gl_Position = prePosition + vFallSpeed*(time.x - vFallTime.x) + 0.5*acc*(time.x - vFallTime.x)*(time.x - vFallTime.x);
+        }
+        fTime = (time.x - vFallTime.x)*2.0;
+    }
+}
+</script>
+    
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+varying vec4 fColor;
+varying float fTime;
+void main() {
+    gl_FragColor = vec4(fColor.x-fTime, fColor.y-fTime, fColor.z-fTime, fColor.w);
+}
+</script>
+<script type="text/javascript" src="Common/webgl-utils.js"></script>
+<script type="text/javascript" src="Common/initShaders.js"></script>
+<script type="text/javascript" src="Common/MV.js"></script>
+<script type="text/javascript" src="fireworks.js"></script>
+</head>
+<body>
+    <title>Triangle</title>
+    <canvas id="gl-canvas" width="512" height="512">
+        Oops... your browser doesn't support the HTML5 canvas element"
+    </canvas>
+    <h3><b>Commands</b></h3>
+    <ul style="list-style: none; margin: 0; padding: 0;">
+        <li>- <b>SPACE</b><br>&nbsp;&nbsp;&nbsp;&nbsp;enables/disables automatic mode</li>
+        <li>- <b>S</b><br>&nbsp;&nbsp;&nbsp;&nbsp;enables/disables 2<sup>nd</sup> level explosion</li>
+    </ul>
+</body>
+</html>
